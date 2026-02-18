@@ -5,12 +5,13 @@ import random
 from pydantic import Field, BaseModel, model_validator
 
 
-def argError(arg: str, argtype: str) -> int:
+def arg_error(arg: str, argtype: str, param: str) -> int:
     print(
-        f"Argument invalid or not present: {Color.red}{arg}{Color.reset}"
-        f"Expected: {arg}={Color.green}{argtype}{Color.reset}"
+        f"Argument invalid or not present: {Color.red}{arg}{Color.reset} "
+        f"Expected: {param}={Color.green}{argtype}{Color.reset}"
         )
     return 1
+
 
 class Parameters(BaseModel):
     """
@@ -20,13 +21,13 @@ class Parameters(BaseModel):
 
     width: int = Field(default=-1)
     height: int = Field(default=-1)
-    entry_pos: Tuple[int, int] = Field(
+    en_pos: Tuple[int, int] = Field(
             default=(-1, -1), min_length=2, max_length=2
             )
-    exit_pos: Tuple[int, int] = Field(
+    ex_pos: Tuple[int, int] = Field(
             default=(-1, -1), min_length=2, max_length=2
             )
-    output_filename: str =  Field(default="")
+    output_filename: str = Field(default="")
     perfect: bool = Field(default=False)
     seed: int | None = 42
     seed_is_random: bool = True
@@ -34,7 +35,7 @@ class Parameters(BaseModel):
     @model_validator(mode='before')
     @classmethod
     def format_input(cls, data: Any) -> Any:
-        for field in ['entry_pos', 'exit_pos']:
+        for field in ['en_pos', 'ex_pos']:
             if field in data and isinstance(data[field], str):
                 data[field] = [int(x.strip()) for x in data[field].split(',')]
         if data.get('seed') == "":
@@ -42,165 +43,109 @@ class Parameters(BaseModel):
             data['seed_is_random'] = True
         return data
 
-    def printParams(self) -> None:
-        """
-        Function to print all the parameters of an instance of Parameters
-        """
-        print(f"WIDTH: {self.width}")
-        print(f"HEIGHT: {self.height}")
-        print(f"ENTRY: {self.entry_pos}")
-        print(f"EXIT: {self.exit_pos}")
-        print(f"OUTPUT: {self.output_filename}")
-        print(f"PERFECT: {self.perfect}")
-        print(f"SEED: {self.seed}")
-        print(f"IS SEED RANDOM: {'YES' if self.seed_is_random else 'NO'}")
-
-    def validate_parameters(self):
-        errors = 0
+    def validate_parameters(self) -> bool:
+        error = 0
         if self.width < 0:
-            errors |= argError("WIDTH", "<INT>")
+            arg_error(str(self.width), "<INT>", "WIDTH")
+            error = 1
+            return False
         if self.height < 0:
-            errors |= argError("HEIGHT", "<INT>")
-        if (
-            self.entry_pos[0] < 0
-            or self.entry_pos[0] > self.width - 1
-            or self.entry_pos[1] < 0
-            or self.entry_pos[1] > self.height - 1
-            ):
-            errors |= argError("ENTRY", "<INT>, <INT>")
-        if (
-            self.exit_pos[0] < 0
-            or self.exit_pos[0] > self.width - 1
-            or self.exit_pos[1] < 0
-            or self.exit_pos[1] > self.height -1
-            ):
-            errors |= argError("EXIT", "<INT>, <INT>")
-        if not self.output_filename:
-            errors |= argError("OUTPUT_FILE", "<STRING>")
-        if self.entry_pos == self.exit_pos:
+            arg_error(str(self.height), "<INT>", "HEIGHT")
+            error = 1
+            return False
+        if self.en_pos[0] < 0\
+                or self.en_pos[0] > self.width - 1\
+                or self.en_pos[1] < 0\
+                or self.en_pos[1] > self.height - 1:
+            arg_error(str(self.en_pos), "<INT >= 0>,<INT >= 0>", "ENTRY")
+            error = 1
+            return False
+        if self.ex_pos[0] < 0\
+                or self.ex_pos[0] > self.width - 1\
+                or self.ex_pos[1] < 0\
+                or self.ex_pos[1] > self.height - 1:
+            arg_error(str(self.ex_pos), "<INT >= 0>, <INT >= 0", "EXIT")
+            error = 1
+            return False
+        if not self.output_filename or\
+                self.output_filename != "maze.txt":
+            arg_error(str(self.output_filename), "<maze.txt>", "OUTPUT_FILE")
+            error = 1
+            return False
+        if self.en_pos == self.ex_pos:
             print(f"{Color.red}Error:{Color.reset} "
                   f"Entry and exit should be different.")
-            errors |= 1
-        if self.seed == 42:
-            argError("SEED", "<INT>")
-            print(
-                f"{Color.blue}The seed was set to 42 by default{Color.reset}"
-                )
-        if errors == 0:
+            error = 1
+            return False
+        if error == 0:
             return True
 
         return False
 
     @classmethod
     def read_config(cls, file_path: str) -> Any:
-        config_data = {}
+        config_data: dict[str, Any] = {}
+
         key_map = {
-                "WIDTH": "width",
-                "HEIGHT": "height",
-                "ENTRY": "entry_pos",
-                "EXIT": "exit_pos",
-                "OUTPUT_FILE": "output_filename",
-                "PERFECT": "perfect",
-                "SEED": "seed"
-                }
+            "WIDTH": "width",
+            "HEIGHT": "height",
+            "ENTRY": "en_pos",
+            "EXIT": "ex_pos",
+            "OUTPUT_FILE": "output_filename",
+            "PERFECT": "perfect",
+            "SEED": "seed"
+        }
+
         try:
             with open(file_path, 'r') as f:
                 for line in f:
-                    line = line.strip()
                     if '=' not in line:
                         continue
-                    k, v = [i.strip() for i in line.split('=', 1)]
-                    if k in key_map:
-                        target_key = key_map[k]
-                        if target_key == "perfect":
-                            config_data[target_key] = v.lower() == "true"
-                        else:
-                            config_data[target_key] = v
+
+                    key, value = [x.strip() for x in line.split('=', 1)]
+
+                    if key not in key_map:
+                        continue
+
+                    target_key = key_map[key]
+
+                    try:
+                        if key in ("WIDTH", "HEIGHT", "SEED"):
+                            config_data[target_key] = int(value)
+
+                        elif key in ("ENTRY", "EXIT"):
+                            x_str, y_str = value.split(',')
+                            x = int(x_str.strip())
+                            y = int(y_str.strip())
+                            config_data[target_key] = (x, y)
+
+                        elif key == "PERFECT":
+                            config_data[target_key] = value.lower() == "true"
+
+                        elif key == "OUTPUT_FILE":
+                            config_data[target_key] = value
+
+                    except Exception:
+                        arg_error(key, "invalid value", key)
+                        continue
+
             params = cls(**config_data)
+
             if not params.validate_parameters():
                 return None
-            return params
-        except FileNotFoundError:
-            print(f"{Color.red}Config not found: {file_path}{Color.reset}")
-        except Exception as e:
-            print(f"{Color.red}Error parsing config: {e}{Color.reset}")
-        return None
 
-    # @classmethod
-    # def read_config2(cls, file: str) -> Any:
-    #     parameters = cls()
-    #     try:
-    #         with open(file, 'r') as config:
-    #             for raw_line in config:
-    #                 if '=' not in raw_line:
-    #                     continue
-    #                 key, value = [item.strip() for item in raw_line.split('=')]
-    #                 if key and value:
-    #                     if key == "WIDTH":
-    #                         try:
-    #                             parameters.width = int(value)
-    #                         except (ValueError, TypeError):
-    #                             argError("WIDTH", "<INT>")
-    #                             return None
-    #
-    #                     if key == "HEIGHT":
-    #                         try:
-    #                             parameters.height = int(value)
-    #                         except (ValueError, TypeError):
-    #                             argError("HEIGHT", "<INT>")
-    #                             return None
-    #
-    #                     if key == "ENTRY":
-    #                         try:
-    #                             parameters.entry_pos = tuple(
-    #                                     int(x) for x in value.split(',')
-    #                                     )
-    #                         except (ValueError, TypeError):
-    #                             argError("ENTRY", "<INT>, <INT>")
-    #                             return None
-    #
-    #                     if key == "EXIT":
-    #                         try:
-    #                             parameters.exit_pos = tuple(
-    #                                     int(x) for x in value.split(',')
-    #                                     )
-    #                         except (ValueError, TypeError):
-    #                             argError("EXIT", "<INT>, <INT>")
-    #                             return None
-    #
-    #                     if key == "OUTPUT_FILE":
-    #                         try:
-    #                             parameters.output_filename = str(value)
-    #                         except (ValueError, TypeError):
-    #                             argError("OUTPUT", "<STRING>")
-    #                             return None
-    #
-    #                     if key == "PERFECT":
-    #                         if value == "True":
-    #                             parameters.perfect = True
-    #                         elif value == "False":
-    #                             parameters.perfect = False
-    #                         else:
-    #                             argError("PERFECT", "BOOLEAN")
-    #                             return None
-    #
-    #                     if key =="SEED":
-    #                         try:
-    #                             if value == "":
-    #                                 parameters.seed = random.randint(1, 9999)
-    #                                 parameters.seed_is_random = True
-    #                             else:
-    #                                 parameters.seed = int(value)
-    #                                 parameters.seed_is_random = False
-    #                         except (ValueError, TypeError):
-    #                             argError("SEED", "<INT>")
-    #                             return None
-    #         if not parameters.validate_parameters():
-    #             return None
-    #     except FileNotFoundError:
-    #         print(f"{Color.red}Config file not found{Color.reset}")
-    #         return None
-    #     return parameters
+            return params
+
+        except FileNotFoundError:
+            print(
+                    f"{Color.red}Config file not found:",
+                    f"{file_path}{Color.reset}"
+                )
+        except Exception:
+            print("Error in parsing config.txt")
+            print(f"Expected format: {Color.green}PARAM=DATA{Color.reset}")
+
+        return None
 
 
 class Color:
@@ -288,12 +233,12 @@ class MazeGenerator:
             print(self.params.height)
             print(self.params.width)
             ent = (
-                int(self.params.entry_pos[0]),
-                int(self.params.entry_pos[1])
+                int(self.params.en_pos[0]),
+                int(self.params.en_pos[1])
                 )
             sal = (
-                int(self.params.exit_pos[0]),
-                int(self.params.exit_pos[1])
+                int(self.params.ex_pos[0]),
+                int(self.params.ex_pos[1])
                 )
             entry_exit = {ent, sal}
             intersection = entry_exit.intersection(temp_watermark)
@@ -304,7 +249,6 @@ class MazeGenerator:
             else:
                 self.watermark = []
 
-
     def createMaze(self) -> None:
         """
         Removes the walls between two adjacent cells.
@@ -313,7 +257,7 @@ class MazeGenerator:
             (xCurrent, yCurrent) = currentCell.position
             (xNext, yNext) = nextCell.position
             if xCurrent > xNext:
-                if "Left"in currentCell.walls:
+                if "Left" in currentCell.walls:
                     currentCell.walls.remove("Left")
                 if "Right" in nextCell.walls:
                     nextCell.walls.remove("Right")
@@ -379,17 +323,14 @@ class MazeGenerator:
                         deleteWalls(cell, random.choice(possibilities))
                         number_of_walls_to_remove -= 1
 
-        print("start maze creation")
         _visitedCells = []
-        _currentCell = self.grid[self.params.entry_pos[1]][self.params.entry_pos[0]]
+        _currentCell = self.grid[self.params.en_pos[1]][self.params.en_pos[0]]
         _visitedCells.append(_currentCell)
         _currentCell.visited = True
         while _visitedCells:
             possibilities = canContinueMoving(_currentCell.position)
-            if (
-                len(possibilities) != 0
-                and _currentCell.position != tuple(self.params.exit_pos)
-                ):
+            if len(possibilities) != 0\
+                    and _currentCell.position != tuple(self.params.ex_pos):
                 _nextCell = random.choice(possibilities)
                 deleteWalls(_currentCell, _nextCell)
                 _currentCell = _nextCell
@@ -405,14 +346,13 @@ class MazeGenerator:
             deleteRandomWalls(self.grid, self.params.width, self.params.height)
         print("end maze creation")
 
-
     def solve(self) -> list[tuple[int, int]]:
         """
         Solve the maze with breadth-first search
         and return path from entry to exit
         """
-        start = tuple(self.params.entry_pos)
-        goal = tuple(self.params.exit_pos)
+        start = tuple(self.params.en_pos)
+        goal = tuple(self.params.ex_pos)
 
         queue = [start]
         parent_map: dict[Any, Any] = {}
@@ -430,10 +370,8 @@ class MazeGenerator:
                 ((x - 1, y), "Left")
             ]
             for (nx, ny), wall in neighbors:
-                if (
-                    0 <= nx < self.params.width
-                    and 0 <= ny < self.params.height
-                    ):
+                if 0 <= nx < self.params.width\
+                        and 0 <= ny < self.params.height:
                     if wall not in cell.walls and (nx, ny) not in parent_map:
                         parent_map[(nx, ny)] = current
                         queue.append((nx, ny))
@@ -454,9 +392,9 @@ class MazeGenerator:
                 cell.printCell(output)
             print(file=output)
         print(file=output)
-        (x, y) = (self.params.entry_pos)
+        (x, y) = (self.params.en_pos)
         print(f"{x}, {y}", file=output)
-        (x, y) = (self.params.exit_pos)
+        (x, y) = (self.params.ex_pos)
         print(f"{x}, {y}", file=output)
         solution: list[tuple[int, int]] = self.solve()
         previous: tuple[int, int] = solution[0]
@@ -483,7 +421,7 @@ class MazeGenerator:
         WALL = f"{Color.gray}██{Color.reset}"
         PATH = f"{Color.green}██{Color.reset}"
         START = f"{Color.red}██{Color.reset}"
-        EXIT = f"{Color.blue}██{Color.reset}"
+        EXIT = f"{Color.red}██{Color.reset}"
         MARK = f"{Color.blue}██{Color.reset}"
         EMPTY = "  "
         watermark_coords = getattr(self, 'watermark', [])
@@ -492,11 +430,9 @@ class MazeGenerator:
             top_line = ""
             for x in range(self.params.width):
                 top_line += WALL
-                if (
-                    "Top" not in self.grid[y][x].walls
-                    and (x, y) in draw_path
-                    and (x, y - 1) in draw_path
-                    ):
+                if "Top" not in self.grid[y][x].walls\
+                        and (x, y) in draw_path\
+                        and (x, y - 1) in draw_path:
                     top_line += PATH
                 else:
                     if "Top" in self.grid[y][x].walls:
@@ -506,11 +442,9 @@ class MazeGenerator:
             print(top_line + WALL)
             mid_line = ""
             for x in range(self.params.width):
-                if (
-                    "Left" not in self.grid[y][x].walls
-                    and (x, y) in draw_path
-                    and (x - 1, y) in draw_path
-                    ):
+                if "Left" not in self.grid[y][x].walls\
+                        and (x, y) in draw_path\
+                        and (x - 1, y) in draw_path:
                     mid_line += PATH
                 else:
                     if "Left" in self.grid[y][x].walls:
@@ -519,9 +453,9 @@ class MazeGenerator:
                         mid_line += EMPTY
 
                 pos = (x, y)
-                if pos == tuple(self.params.entry_pos):
+                if pos == tuple(self.params.en_pos):
                     mid_line += START
-                elif pos == tuple(self.params.exit_pos):
+                elif pos == tuple(self.params.ex_pos):
                     mid_line += EXIT
                 elif pos in watermark_coords:
                     mid_line += MARK
@@ -531,7 +465,7 @@ class MazeGenerator:
                     mid_line += EMPTY
             print(mid_line + WALL)
 
-        print(WALL * (self.params.width * 2  + 1))
+        print(WALL * (self.params.width * 2 + 1))
 
 
 def clear() -> None:
@@ -543,6 +477,7 @@ def main() -> None:
     Controls the number of args received and executes the program in order,
     including the reauired menu controlled by options.
     """
+
     if len(sys.argv) == 1:
         print(
             f"{Color.red}Error:{Color.reset} Configuration file not"
@@ -563,10 +498,6 @@ def main() -> None:
             random.seed(parameters.seed)
             maze = MazeGenerator(parameters)
             maze.print_forty_two()
-            # if not maze.watermark:
-            #     print(f"{Color.red}The exit or entrance collides with the"
-            #           f"Watermark {Color.reset}")
-            #     return
             maze.createMaze()
             with open(parameters.output_filename, mode="w+") as output:
                 maze.export(output)
@@ -588,10 +519,8 @@ def main() -> None:
                 )
                 option = input("\nOption: ").lower()
                 if option == '1':
-                    if (
-                        not hasattr(maze, 'solution')
-                        or len(maze.solution) == 0
-                        ):
+                    if not hasattr(maze, 'solution')\
+                            or len(maze.solution) == 0:
                         maze.solve()
                     if not bool_solve:
                         o_solution = "Hide solution"
@@ -614,11 +543,8 @@ def main() -> None:
                 elif option == "4":
                     break
         except Exception as e:
-            print(f"Errori: {e}")
-
-
+            print(f"Error: {e}")
 
 
 if __name__ == "__main__":
     main()
-
