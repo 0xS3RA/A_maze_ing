@@ -201,6 +201,7 @@ class MazeGenerator:
         self.grid = []
         self.midle = (int(params.height/2), int(params.width/2))
         self.params = params
+
         for y in range(0, params.height):
             row = []
             for x in range(0, params.width):
@@ -230,8 +231,6 @@ class MazeGenerator:
                     temp_watermark.append((start_x + x_idx, start_y + y_idx))
         self.watermark = []
         if self.params.height > 10 and self.params.width > 12:
-            print(self.params.height)
-            print(self.params.width)
             ent = (
                 int(self.params.en_pos[0]),
                 int(self.params.en_pos[1])
@@ -344,7 +343,6 @@ class MazeGenerator:
 
         if not self.params.perfect:
             deleteRandomWalls(self.grid, self.params.width, self.params.height)
-        print("end maze creation")
 
     def solve(self) -> list[tuple[int, int]]:
         """
@@ -512,8 +510,7 @@ def main() -> None:
                     f"\n{Color.white}=== A-Maze-ing ==={Color.reset} \n"
                     f"\nSeed: {Color.green}{maze.params.seed}{Color.reset}\n"
                     f"\n{Color.green}1{Color.reset} - {o_solution}"
-                    f"\n{Color.green}2{Color.reset} - Change color "
-                    "(between presets)"
+                    f"\n{Color.green}2{Color.reset} - Change color"
                     f"\n{Color.green}3{Color.reset} - Regenerate"
                     f"\n{Color.green}4{Color.reset} - Exit"
                 )

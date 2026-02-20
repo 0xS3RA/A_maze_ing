@@ -2,9 +2,9 @@ VENV = venv
 PYTHON = python3
 VENV_PYTHON = $(VENV)/bin/python
 VENV_PIP = $(VENV)/bin/pip
-NAME = a_maze_ing.py
-ARG = config.txt
-REQUIEREMENTS = requirements.txt
+NAME = ./mazegen/a_maze_ing.py
+ARG = ./config.txt
+REQUIEREMENTS = ./requirements.txt
 
 .PHONY: install run debug clean lint
 
@@ -26,12 +26,12 @@ debug:
 
 #make clean
 clean:
-	rm -rf   __pycache__ .mypy_cache *.pyc *.pyo
+	rm -rf   __pycache__ .mypy_cache *.pyc *.pyo *.swp
 
 #make lint
 lint:
-	./venv/bin/python -m flake8 a_maze_ing.py
-	./venv/bin/python -m mypy a_maze_ing.py \
+	./venv/bin/python -m flake8 $(NAME)
+	./venv/bin/python -m mypy $(NAME) \
 		--warn-return-any \
 		--warn-unused-ignores \
 		--ignore-missing-imports \

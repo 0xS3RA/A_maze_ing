@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mazegen"
+version = "1.0.0"
+description = "Amezing"
+authors = [
+    {name = "vvan-ach"},
+    {name = "bsaipidi"}
+]
+requires-python = ">=3.10"
