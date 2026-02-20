@@ -26,8 +26,11 @@ debug:
 
 #make clean
 clean:
-	rm -rf   __pycache__ .mypy_cache *.pyc *.pyo *.swp
-
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type d -name ".mypy_cache" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
+	find . -type f -name "*.swp" -delete
 #make lint
 lint:
 	./venv/bin/python -m flake8 $(NAME)
